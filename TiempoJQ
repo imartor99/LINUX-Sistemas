@@ -1,0 +1,43 @@
+ #!/bin/bash
+ encode_ascii() {
+    sed -i 's/\\u00c3\\u00a9/é/g' 
+    sed -i 's/\\u00c3\\u00a1/á/g' 
+    sed -i 's/\\u00c3\\u00ad/í/g' 
+    sed -i 's/\\u00c3\\u00b3/ó/g' 
+    sed -i 's/\\u00c3\\u00da/ú/g' 
+    sed -i 's/\\u00c3\\u00b1/ñ/g' 
+    sed -i 's/\\u00c3\\u0091/Ñ/g' 
+    sed -i 's/\\u00c3\\u0081/Á/g' 
+    sed -i 's/\\u00c3\\u0089/É/g' 
+    sed -i 's/\\u00c3\\u00cd/Í/g'
+    sed -i 's/\\u00c3\\u00da/Ú/g' 
+    sed -i 's/\\u00c3\\u00d3/Ó/g' 
+}
+ 
+if [ $# -ne 1 ]; then
+	echo "Debes introducir un argumento:[ Fichero.sh ] nombre_ciudad"
+	exit 1
+fi
+prov=$1
+curl -s https://www.el-tiempo.net/api/json/v2/provincias > datos.txt
+codprov=$(jq --arg prov "$1" '.provincias[] | select(.NOMBRE_PROVINCIA == $prov) | .CODPROV' datos.txt | cut -d '"' -f2) 
+json=`curl -s https://www.el-tiempo.net/api/json/v2/provincias/$codprov | jq '.'`
+
+tiempoHoy=$(jq '.today.p' <<<$json | cut -d '"' -f2) #obtenemos prediccion de hoy
+tiempoManana=$(jq '.tomorrow.p' <<< $json | cut -d '"' -f2) #obtenemos prediccion mañana
+
+temp_max=$(jq --arg prov "$1" '.ciudades[] | select(.name == $prov) | .temperatures.max' <<< $json | cut -d '"' -f2)
+temp_min=$(jq --arg prov "$1" '.ciudades[] | select(.name == $prov) | .temperatures.min' <<< $json | cut -d '"' -f2)
+
+tiempoHoy=$(encode_ascii "$tiempoHoy")
+tiempoManana=$(encode_ascii "$tiempoManana")
+
+
+
+echo -e "El tiempo en España:\n "
+echo -e "Para hoy: $tiempoHoy\n" 
+echo -e "Para mañana: $tiempoManana\n"
+echo -e "Temperaturas:\n "
+echo -e "Maxima: $temp_max\n"
+echo "Minima: $temp_min"
+
