@@ -1,0 +1,59 @@
+#!/bin/bash
+
+# Verificar que se ha pasado una fecha como argumento
+if [ $# -ne 1 ]; then
+    echo "Uso: $0 YYYY-MM-DD"
+    exit 1
+fi
+
+FECHA=$1
+ANIO=$(echo $FECHA | cut -d'-' -f1)
+MES=$(echo $FECHA | cut -d'-' -f2)
+DIA=$(echo $FECHA | cut -d'-' -f3)
+
+CSV_URL="https://www.granada.org/inet/calidadaire.nsf/aire.csv"
+CSV_FILE="aire.csv"
+DATOS_FILTRADOS="no2_data.txt"
+GRAFICO="grafico_no2.jpg"
+HTML_FILE="/var/www/html/resultado.html"
+
+# Descargar el archivo CSV con curl
+curl -s -o "$CSV_FILE" "$CSV_URL" -X POST --data "anio=$ANIO&mes=$MES&dia=$DIA&diasem=1&parametro=NO2&punto=NORTE&tipo=d"  #tambien puedo usar -d en lugar de --data
+
+# Filtrar datos de NO2 por hora, omitiendo las primeras líneas del CSV
+awk -F ';' 'NR > 8 && $1 ~ /^[0-9]+$/ {gsub(/ /, "", $0); print $1, $2}' "$CSV_FILE" > "$DATOS_FILTRADOS"
+
+# Verificar si hay datos
+if [ ! -s "$DATOS_FILTRADOS" ]; then
+    echo "No hay datos para la fecha $FECHA"
+    exit 1
+fi
+
+# Generar el gráfico con gnuplot
+gnuplot << EOF
+set terminal jpeg size 800,600
+set output "$GRAFICO"
+set title "Concentración de NO2 en Granada Norte - $FECHA"
+set xlabel "Hora"
+set ylabel "NO2 (µg/m³)"
+set grid
+set style line 1 lt 1 pt 7 lc rgb "blue" lw 2
+plot "$DATOS_FILTRADOS" using 1:2 with linespoints linestyle 1 title "NO2"
+EOF
+
+# Mover el gráfico al directorio web
+mv "$GRAFICO" /var/www/html/
+
+# Crear la página HTML para mostrar el gráfico
+echo "<html>
+    <head>
+        <title>Resultados Calidad del Aire</title>
+    </head>
+    <body>
+        <h2>Concentracion de NO2 en Granada Norte - $FECHA</h2>
+        <img src='/grafico_no2.jpg' alt='Gráfico de NO2'>
+    </body>
+</html>" > "$HTML_FILE"
+
+#Mensaje de exito en la ejecucion
+echo "Proceso completado."
