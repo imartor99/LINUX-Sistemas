@@ -1,0 +1,41 @@
+#!/bin/bash
+USERS_FILE="usuarios.csv"
+
+function alta_usuarios() {
+    local total=0 exist=0 fail=0
+    while IFS= read -r user; do    #IFS es para a la hora de leer linea a linea el fichero .csv no haya problemas con los espacios
+        clean_user=$(echo "$user" | tr '[:upper:]' '[:lower:]' | tr ' ' '_') #Formateo el nombre de los usuarios a un formato valido
+        if id "$clean_user" &>/dev/null; then   #verifico si existe el usuario a crear
+            ((exist++))
+        else
+            useradd "$clean_user" && ((total++)) || ((fail++))
+        fi
+    done < "$USERS_FILE"
+    echo "Usuarios creados: $total"
+    echo "Usuarios existentes: $exist"
+    echo "Errores en la creación: $fail"
+}
+
+function baja_usuarios() {
+    read -p "Ingrese UID Inicial: " uid_ini
+    read -p "Ingrese UID Final: " uid_fin
+#buscamos los UIDS introducidos por pantalla en /etc/passwd ; $3 hace referencia al tercer campo de la lista de usuarios en /etc/passwd 
+    for uid in $(awk -F: -v min="$uid_ini" -v max="$uid_fin" '($3 >= min) && ($3 <= max) {print $1}' /etc/passwd); do
+        userdel -r "$uid" && echo "Usuario $uid eliminado." || echo "Error eliminando usuario $uid."
+    done
+}
+
+while true; do
+ 	echo "Menú:"
+        echo "1. Dar de alta usuarios"
+        echo "2. Dar de baja usuarios"
+	echo "3. Salir"
+        read -p "Opción: " OPCION
+
+        case $OPCION in
+                1) alta_usuarios ;;
+                2) baja_usuarios ;;
+		3) exit ;;
+		*) echo "Opción no válida"
+	esac
+done
